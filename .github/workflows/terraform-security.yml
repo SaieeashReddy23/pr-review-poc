@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Install dependencies
       - name: Set up Python
@@ -29,11 +29,11 @@ jobs:
           mkdir -p reports
           checkov -d . -o json -s --output-file-path reports/checkov.json
 
-      # Run tfsec (soft-fail, JSON output)
+      # ✅ Run tfsec using official GitHub Action
       - name: Run tfsec
-        run: |
-          curl -sSL https://aquasecurity.github.io/tfsec/install.sh | bash
-          ./bin/tfsec . --format json --out reports/tfsec.json || true
+        uses: aquasecurity/tfsec-action@v1
+        with:
+          args: --format json --out reports/tfsec.json --soft-fail
 
       # Merge reports into one JSON
       - name: Merge Reports
@@ -65,3 +65,4 @@ jobs:
         with:
           name: ai-security-report
           path: ai_review.md
+          retention-days: 7
