@@ -1,28 +1,35 @@
-import json
+# .github/scripts/ai_review.py
+import os
 import sys
-import openai
+import json
+from openai import OpenAI
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Get API key from env
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    print("❌ OPENAI_API_KEY is missing. Please set it in GitHub secrets.")
+    sys.exit(1)
 
-report_file = sys.argv[1]
+client = OpenAI(api_key=api_key)
 
-with open(report_file, "r") as f:
-    report = f.read()
+# Load the Checkov report
+report_path = sys.argv[1]
+with open(report_path, "r") as f:
+    report = json.load(f)
 
+# Prepare a prompt for the AI
 prompt = f"""
-You are a cloud security reviewer. Analyze this Terraform scan report.
-- Summarize key vulnerabilities in simple language.
-- Mark risks as Critical / High / Medium / Low.
-- Suggest Terraform code changes to fix them.
-- If everything looks safe, respond with ✅ 'No major security risks found.'
+You are a security reviewer. Analyze the following Checkov Terraform scan report
+and summarize key findings. Highlight **High** and **Critical** issues first.
 
-Report:
-{report}
+Report JSON:
+{json.dumps(report)[:5000]}  # keep prompt small, truncate if huge
 """
 
-response = openai.ChatCompletion.create(
+# Call OpenAI (GPT-4o-mini for cheaper, fast review)
+response = client.chat.completions.create(
     model="gpt-4o-mini",
-    messages=[{"role": "user", "content": prompt}]
+    messages=[{"role": "user", "content": prompt}],
 )
 
-print(response["choices"][0]["message"]["content"])
+print(response.choices[0].message.content)
