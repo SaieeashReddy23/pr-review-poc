@@ -26,7 +26,7 @@ jobs:
       - name: Run Checkov
         run: |
           mkdir -p reports
-          checkov -d . -o json --output-file-path reports/report.json --quiet || true
+          checkov -d . -o json --output-file-path-file reports/report.json --quiet || true
           [ -s reports/report.json ] || echo '{}' > reports/report.json
 
       - name: Run AI Security Review
@@ -34,7 +34,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python .github/scripts/ai_review.py reports/report.json > ai_review.md
-          cat ai_review.md   # 👀 print summary in logs
+          cat ai_review.md   # 👀 show in logs
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
