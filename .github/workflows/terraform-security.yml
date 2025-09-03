@@ -4,31 +4,45 @@ on:
   pull_request:
     paths:
       - '**.tf'
-  workflow_dispatch:
+  workflow_dispatch: # ✅ manual trigger
 
 jobs:
   terraform-security:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout PR code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Run Checkov
+      # Install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      # Run Checkov (soft-fail, JSON output)
       - name: Run Checkov
         run: |
-          pip install checkov
-          checkov -d . -o json > checkov_report.json
+          mkdir -p reports
+          checkov -d . -o json -s --output-file-path reports/checkov.json
 
-      # Run tfsec
+      # Run tfsec (soft-fail, JSON output)
       - name: Run tfsec
         run: |
           curl -sSL https://aquasecurity.github.io/tfsec/install.sh | bash
-          ./bin/tfsec . --format json --out tfsec_report.json || true
+          ./bin/tfsec . --format json --out reports/tfsec.json || true
 
-      # Merge results
+      # Merge reports into one JSON
       - name: Merge Reports
         run: |
-          cat checkov_report.json tfsec_report.json > combined_report.json
+          sudo apt-get update && sudo apt-get install -y jq
+          jq -n \
+            --slurpfile checkov reports/checkov.json \
+            --slurpfile tfsec reports/tfsec.json \
+            '{checkov: $checkov[0], tfsec: $tfsec[0]}' > combined_report.json
 
       # AI Security Review
       - name: Run AI Security Review
@@ -37,8 +51,17 @@ jobs:
         run: |
           python .github/scripts/ai_review.py combined_report.json > ai_review.md
 
-      # Post AI Review as PR Comment
+      # Comment on PR if triggered by PR
       - name: Comment on PR
+        if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
+          path: ai_review.md
+
+      # Upload artifact if triggered manually
+      - name: Upload AI Review Report
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ai-security-report
           path: ai_review.md
