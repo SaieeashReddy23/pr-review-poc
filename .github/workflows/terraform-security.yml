@@ -26,8 +26,15 @@ jobs:
       - name: Run Checkov
         run: |
           mkdir -p reports
-          checkov -d . -o json --output-file-path-file reports/report.json --quiet || true
-          [ -s reports/report.json ] || echo '{}' > reports/report.json
+          # Always write to a single JSON file
+          checkov -d . --quiet -o json > reports/report.json || echo '{}' > reports/report.json
+
+      - name: Debug Report
+        run: |
+          echo "Contents of reports/:"
+          ls -lh reports
+          echo "Checkov report content:"
+          cat reports/report.json || true
 
       - name: Run AI Security Review
         env:
