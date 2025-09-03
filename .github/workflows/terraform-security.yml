@@ -1,0 +1,43 @@
+name: Terraform Security AI Review
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+
+jobs:
+  terraform-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v3
+
+      # Run Checkov
+      - name: Run Checkov
+        run: |
+          pip install checkov
+          checkov -d . -o json > checkov_report.json
+
+      # Run tfsec
+      - name: Run tfsec
+        run: |
+          curl -sSL https://aquasecurity.github.io/tfsec/install.sh | bash
+          ./bin/tfsec . --format json --out tfsec_report.json || true
+
+      # Merge results
+      - name: Merge Reports
+        run: |
+          cat checkov_report.json tfsec_report.json > combined_report.json
+
+      # AI Security Review
+      - name: Run AI Security Review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python .github/scripts/ai_review.py combined_report.json > ai_review.md
+
+      # Post AI Review as PR Comment
+      - name: Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: ai_review.md
