@@ -19,14 +19,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Checkov
-        run: pip install checkov
+      - name: Install Dependencies
+        run: |
+          pip install checkov openai
 
       - name: Run Checkov
         run: |
           mkdir -p reports
           checkov -d . -o json --output-file-path reports/report.json --quiet || true
-          # Ensure report file exists
           [ -s reports/report.json ] || echo '{}' > reports/report.json
 
       - name: Run AI Security Review
@@ -34,7 +34,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python .github/scripts/ai_review.py reports/report.json > ai_review.md
-          cat ai_review.md   # 👀 show summary in logs
+          cat ai_review.md   # 👀 print summary in logs
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
