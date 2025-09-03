@@ -1,44 +1,21 @@
-provider "aws" {
-  region = "us-east-1"
+# 🚨 VULNERABLE: Unencrypted EBS volume
+resource "aws_ebs_volume" "unencrypted_volume" {
+  availability_zone = "us-east-1a"
+  size              = 10
+  type              = "gp2"
+  # missing encryption => should set encrypted = true
 }
 
-# 🚨 VULNERABLE: Public S3 bucket
-resource "aws_s3_bucket" "public_bucket" {
-  bucket = "my-public-bucket-poc"
-  acl    = "public-read" # Should be private
-}
-
-# 🚨 VULNERABLE: Security group allows all traffic
-resource "aws_security_group" "open_sg" {
-  name        = "open_sg"
-  description = "Open to the world"
-  vpc_id      = "vpc-123456"
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Should be restricted
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# ✅ SAFE: Encrypted S3 bucket
-resource "aws_s3_bucket" "secure_bucket" {
-  bucket = "my-secure-bucket-poc"
-  acl    = "private"
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
+# 🚨 VULNERABLE: RDS instance with public access and no encryption
+resource "aws_db_instance" "insecure_rds" {
+  identifier         = "insecure-rds"
+  allocated_storage  = 20
+  engine             = "mysql"
+  engine_version     = "8.0"
+  instance_class     = "db.t3.micro"
+  username           = "admin"
+  password           = "password123"
+  publicly_accessible = true  # 🚨 Should be false
+  storage_encrypted   = false # 🚨 Should be true
+  skip_final_snapshot = true
 }
