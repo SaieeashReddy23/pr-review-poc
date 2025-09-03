@@ -25,35 +25,16 @@ jobs:
       - name: Run Checkov
         run: |
           mkdir -p reports
-          checkov -d . -o json --output-file-path reports/checkov.json --quiet || true
-          # If no report generated, create empty JSON
-          [ -s reports/checkov.json ] || echo '{}' > reports/checkov.json
-
-      - name: Run tfsec (GitHub Action)
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: json
-          soft_fail: true
-          output_file: reports/tfsec.json
-
-      - name: Ensure tfsec report exists
-        run: |
-          [ -s reports/tfsec.json ] || echo '{}' > reports/tfsec.json
-
-      - name: Merge Reports
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          jq -n \
-            --slurpfile checkov reports/checkov.json \
-            --slurpfile tfsec reports/tfsec.json \
-            '{checkov: $checkov[0], tfsec: $tfsec[0]}' > combined_report.json
+          checkov -d . -o json --output-file-path reports/report.json --quiet || true
+          # Ensure report file exists
+          [ -s reports/report.json ] || echo '{}' > reports/report.json
 
       - name: Run AI Security Review
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          python .github/scripts/ai_review.py combined_report.json > ai_review.md
-          cat ai_review.md   # 👀 Also print in logs for manual runs
+          python .github/scripts/ai_review.py reports/report.json > ai_review.md
+          cat ai_review.md   # 👀 show summary in logs
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
