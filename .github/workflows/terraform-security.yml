@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - '**.tf'
-  workflow_dispatch: # ✅ manual trigger
+  workflow_dispatch:
 
 jobs:
   terraform-security:
@@ -14,7 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install dependencies
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -23,19 +22,18 @@ jobs:
       - name: Install Checkov
         run: pip install checkov
 
-      # Run Checkov (soft-fail, JSON output)
       - name: Run Checkov
         run: |
           mkdir -p reports
           checkov -d . -o json -s --output-file-path reports/checkov.json
 
-      # ✅ Run tfsec using official GitHub Action
-      - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.0
+      - name: Run tfsec (GitHub Action)
+        uses: aquasecurity/tfsec-action@v1.0.3 # <–– Valid version
         with:
-          args: --format json --out reports/tfsec.json --soft-fail
+          format: json
+          soft_fail: true
+          output_file: reports/tfsec.json
 
-      # Merge reports into one JSON
       - name: Merge Reports
         run: |
           sudo apt-get update && sudo apt-get install -y jq
@@ -44,21 +42,18 @@ jobs:
             --slurpfile tfsec reports/tfsec.json \
             '{checkov: $checkov[0], tfsec: $tfsec[0]}' > combined_report.json
 
-      # AI Security Review
       - name: Run AI Security Review
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python .github/scripts/ai_review.py combined_report.json > ai_review.md
 
-      # Comment on PR if triggered by PR
       - name: Comment on PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: ai_review.md
 
-      # Upload artifact if triggered manually
       - name: Upload AI Review Report
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
